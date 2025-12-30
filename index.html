@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepAR Face Effect</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            overflow: hidden;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            z-index: 2;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            z-index: 10;
+            opacity: 1;
+            background-color: transparent;
+            pointer-events: none;
+            display: none;
+        }
+
+        .camera-start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .camera-start-screen h2 {
+            color: #fff;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .camera-start-screen p {
+            color: #ccc;
+            font-size: 16px;
+            margin: 0;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .btn {
+            padding: 16px 48px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+
+        .btn-start {
+            background-color: #4CAF50;
+        }
+
+        .btn-start:hover {
+            background-color: #45a049;
+        }
+
+        .btn-ar {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .btn-ar-active {
+            background-color: rgba(255, 152, 0, 0.9);
+        }
+
+        .btn-ar-inactive {
+            background-color: rgba(33, 150, 243, 0.9);
+        }
+
+        .btn-stop {
+            padding: 12px 24px;
+            font-size: 16px;
+            color: #fff;
+            background-color: rgba(255, 59, 48, 0.9);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        .status-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 20;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-camera {
+            background-color: rgba(76, 175, 80, 0.9);
+        }
+
+        .status-ar {
+            background-color: rgba(33, 150, 243, 0.9);
+            font-size: 13px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #fff;
+            border-radius: 50%;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            font-size: 18px;
+            z-index: 100;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .error-message {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 59, 48, 0.95);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            max-width: 90%;
+            text-align: center;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        .error-dismiss {
+            margin-top: 8px;
+            padding: 6px 16px;
+            font-size: 12px;
+            background-color: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .instructions {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            max-width: 340px;
+            z-index: 20;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .instructions h3 {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+
+        .instructions p {
+            line-height: 1.6;
+            color: #ccc;
+        }
+
+        .instructions.active {
+            background-color: rgba(33, 150, 243, 0.9);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .effect-selector {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 20;
+            max-width: 220px;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .effect-selector::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .effect-selector::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+        }
+
+        .effect-selector::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .effect-selector::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        #effectButtonsContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .effect-btn {
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: rgba(0, 0, 0, 0.7);
+            transition: all 0.3s;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .effect-btn:hover {
+            background-color: rgba(33, 150, 243, 0.8);
+            border-color: rgba(255, 255, 255, 0.6);
+            transform: translateX(5px);
+        }
+
+        .effect-btn.active {
+            background-color: rgba(76, 175, 80, 0.9);
+            border-color: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .effect-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .effect-btn .effect-icon {
+            font-size: 20px;
+        }
+
+        .effect-selector-title {
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- Video element for HTML5 camera feed -->
+        <video id="video" autoplay playsinline muted></video>
+        
+        <!-- Canvas element for DeepAR rendering -->
+        <canvas id="canvas"></canvas>
+        
+        <!-- Camera start screen -->
+        <div id="cameraStartScreen" class="camera-start-screen">
+            <h2>Camera View</h2>
+            <p>Click the button below to start your camera</p>
+            <button id="btnStartCamera" class="btn btn-start">📸 Start Camera</button>
+        </div>
+        
+        <!-- Effect Selector -->
+        <div id="effectSelector" class="effect-selector hidden">
+            <div class="effect-selector-title">🎭 Select Effect</div>
+            <div id="effectButtonsContainer"></div>
+        </div>
+        
+        <!-- Controls -->
+        <div id="controls" class="controls hidden">
+            <button id="btnToggleAR" class="btn-ar btn-ar-inactive">🎭 Enable AR Effect</button>
+            <button id="btnStopCamera" class="btn-stop">Stop Camera</button>
+        </div>
+        
+        <!-- Status indicators -->
+        <div id="statusContainer" class="status-container hidden">
+            <div class="status-badge status-camera">
+                <span class="status-dot"></span>
+                Camera Active
+            </div>
+            <div id="arStatus" class="status-badge status-ar hidden">Not initialized</div>
+        </div>
+        
+        <!-- Loading overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div style="text-align: center;">
+                <div style="margin-bottom: 10px;">⏳</div>
+                <span id="loadingText">Loading...</span>
+            </div>
+        </div>
+        
+        <!-- Error message -->
+        <div id="errorMessage" class="error-message">
+            <div style="margin-bottom: 8px;">⚠️ <span id="errorText"></span></div>
+            <button class="error-dismiss" onclick="dismissError()">Dismiss</button>
+        </div>
+        
+        <!-- Instructions panel -->
+        <div id="instructions" class="instructions hidden">
+            <h3>🎭 AR Effect Guide</h3>
+            <p>
+                <strong style="color: #4CAF50;">Ready to Use!</strong><br>
+                → Click "Enable AR Effect" to start<br>
+                → Select an effect from the left panel<br>
+                → Show your face to the camera<br><br>
+                <strong style="color: #2196F3;">8 Effects Available!</strong><br>
+                <span style="font-size: 11px; color: rgba(255,255,255,0.7);">
+                    All effects are loaded from the assets folder
+                </span>
+            </p>
+        </div>
+    </div>
+
+    <!-- DeepAR AR Face Effects App - Production Ready for Netlify -->
+    <script type="module">
+        // DeepAR License Key
+        // ⚠️ IMPORTANT: Replace this with your own valid DeepAR license key
+        // Get a license from: https://www.deepar.ai/ or https://developer.deepar.ai/
+        // License keys are domain-specific - make sure your domain matches the license
+        const DEEPAR_LICENSE_KEY = '921309a3bd25af1c4f3d7900f47bec497898e068814a7e825d55643ab7a7c9c90bdc48eaadeb2d1b';
+        
+        // Log current domain for license debugging (production: minimal logging)
+
+        // State variables
+        let isCameraActive = false;
+        let isLoading = false;
+        let error = null;
+        let isAREnabled = false;
+        let isEffectLoaded = false;
+        let arStatus = 'Not initialized';
+        let currentEffect = null; // Track currently loaded effect
+        
+        // Available effects - all .deepar files from assets folder
+        const availableEffects = [
+            { name: 'flower_face.deepar', icon: '🌸', label: 'Flower Face' },
+            { name: 'burning_effect.deepar', icon: '🔥', label: 'Burning Effect' },
+            { name: 'Elephant_Trunk.deepar', icon: '🐘', label: 'Elephant Trunk' },
+            { name: 'Emotion_Meter.deepar', icon: '😊', label: 'Emotion Meter' },
+            { name: 'Emotions_Exaggerator.deepar', icon: '😄', label: 'Emotions Exaggerator' },
+            { name: 'Fire_Effect.deepar', icon: '🔥', label: 'Fire Effect' },
+            { name: 'Humanoid.deepar', icon: '👤', label: 'Humanoid' },
+            { name: 'Neon_Devil_Horns.deepar', icon: '😈', label: 'Neon Devil Horns' }
+        ];
+
+        // Function to create effect buttons dynamically
+        function createEffectButtons() {
+            const container = document.getElementById('effectButtonsContainer');
+            if (!container) return;
+            
+            // Clear existing buttons
+            container.innerHTML = '';
+            
+            // Create button for each effect
+            availableEffects.forEach((effect, index) => {
+                const button = document.createElement('button');
+                button.className = 'effect-btn';
+                button.id = `btnEffect_${index}`;
+                button.setAttribute('data-effect', effect.name);
+                button.innerHTML = `
+                    <span class="effect-icon">${effect.icon}</span>
+                    <span>${effect.label}</span>
+                `;
+                button.addEventListener('click', () => switchEffect(effect.name));
+                container.appendChild(button);
+            });
+        }
+        
+        // References
+        let videoElement = null;
+        let canvasElement = null;
+        let streamRef = null;
+        let deepARInstance = null;
+        
+        // DOM elements
+        let cameraStartScreen, controls, statusContainer, arStatusEl, loadingOverlay, loadingText, errorMessage, errorText, instructions, effectSelector;
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            // Get DOM elements
+            videoElement = document.getElementById('video');
+            canvasElement = document.getElementById('canvas');
+            cameraStartScreen = document.getElementById('cameraStartScreen');
+            controls = document.getElementById('controls');
+            statusContainer = document.getElementById('statusContainer');
+            arStatusEl = document.getElementById('arStatus');
+            loadingOverlay = document.getElementById('loadingOverlay');
+            loadingText = document.getElementById('loadingText');
+            errorMessage = document.getElementById('errorMessage');
+            errorText = document.getElementById('errorText');
+            instructions = document.getElementById('instructions');
+            effectSelector = document.getElementById('effectSelector');
+            
+            // Set canvas dimensions
+            canvasElement.width = 1280;
+            canvasElement.height = 720;
+            
+            // Event listeners
+            document.getElementById('btnStartCamera').addEventListener('click', startCamera);
+            document.getElementById('btnToggleAR').addEventListener('click', toggleAR);
+            document.getElementById('btnStopCamera').addEventListener('click', stopCamera);
+            
+            // Dynamically create effect buttons
+            createEffectButtons();
+            
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', () => {
+                if (deepARInstance) {
+                    deepARInstance.shutdown();
+                }
+                if (streamRef) {
+                    streamRef.getTracks().forEach(track => track.stop());
+                }
+            });
+        });
+
+        // Suppress WebGL warnings
+        function suppressWebGLErrors() {
+            const originalWarn = console.warn;
+            const originalError = console.error;
+            
+            console.warn = (...args) => {
+                const message = String(args[0] || '');
+                if (
+                    message.includes('WebGL') ||
+                    message.includes('INVALID_OPERATION') ||
+                    message.includes('INVALID_ENUM') ||
+                    message.includes('texImage2D') ||
+                    message.includes('texSubImage2D') ||
+                    message.includes('renderbufferStorage') ||
+                    message.includes('getInternalformatParameter') ||
+                    message.includes('glGenerateMipmap') ||
+                    message.includes('GL_INVALID_OPERATION')
+                ) {
+                    return;
+                }
+                originalWarn(...args);
+            };
+            
+            console.error = (...args) => {
+                const message = String(args[0] || '');
+                if (
+                    message.includes('WebGL') ||
+                    message.includes('INVALID_OPERATION') ||
+                    message.includes('INVALID_ENUM') ||
+                    message.includes('texImage2D') ||
+                    message.includes('texSubImage2D') ||
+                    message.includes('renderbufferStorage') ||
+                    message.includes('getInternalformatParameter') ||
+                    message.includes('glGenerateMipmap') ||
+                    message.includes('GL_INVALID_OPERATION')
+                ) {
+                    return;
+                }
+                originalError(...args);
+            };
+        }
+
+        // Suppress DeepAR WASM messages
+        function suppressWASMMessages() {
+            const originalConsoleError = console.error;
+            const originalConsoleLog = console.log;
+            
+            console.error = (...args) => {
+                const messageStr = String(args[0] || '');
+                if (
+                    messageStr.includes('vision_wasm_internal') ||
+                    messageStr.includes('mediaPipe') ||
+                    messageStr.includes('segmentation') ||
+                    messageStr.includes('TensorFlow') ||
+                    messageStr.includes('XNNPACK') ||
+                    messageStr.includes('delegate') ||
+                    messageStr.includes('wasm') ||
+                    messageStr.includes('WASM') ||
+                    messageStr.includes('Created TensorFlow') ||
+                    messageStr.includes('INFO: Created')
+                ) {
+                    return;
+                }
+                originalConsoleError(...args);
+            };
+            
+            console.log = (...args) => {
+                const messageStr = String(args[0] || '');
+                if (
+                    messageStr.includes('TensorFlow') ||
+                    messageStr.includes('XNNPACK') ||
+                    messageStr.includes('INFO: Created')
+                ) {
+                    return;
+                }
+                originalConsoleLog(...args);
+            };
+            
+            return { originalConsoleError, originalConsoleLog };
+        }
+
+        // Initialize DeepAR
+        async function initializeDeepAR() {
+            try {
+                if (!canvasElement || !videoElement) {
+                    showError('Camera not ready. Please try again.');
+                    return false;
+                }
+
+                setArStatus('Initializing DeepAR...');
+                setLoading(true, 'Initializing AR...');
+                
+                // Suppress WebGL warnings
+                suppressWebGLErrors();
+                
+                // Import DeepAR - try multiple CDN sources
+                let deepar;
+                const cdnUrls = [
+                    'https://esm.sh/deepar@5.6.20',
+                    'https://esm.sh/deepar@5.6.20/esm/index.js',
+                    'https://cdn.skypack.dev/deepar@5.6.20',
+                    'https://cdn.jsdelivr.net/npm/deepar@5.6.20/+esm'
+                ];
+                
+                let lastError = null;
+                let corsError = false;
+                
+                for (const url of cdnUrls) {
+                    try {
+                        deepar = await import(url);
+                        break;
+                    } catch (importErr) {
+                        const errMsg = importErr.message || String(importErr);
+                        lastError = importErr;
+                        
+                        // Check for CORS errors
+                        if (errMsg.includes('CORS') || errMsg.includes('Cross-Origin') || 
+                            errMsg.includes('Access-Control-Allow-Origin') ||
+                            errMsg.includes('blocked by CORS policy')) {
+                            corsError = true;
+                        }
+                        continue;
+                    }
+                }
+                
+                if (!deepar) {
+                    const errorMsg = lastError?.message || String(lastError) || 'Unknown error';
+                    
+                    if (corsError) {
+                        throw new Error('CORS Error: Failed to load DeepAR SDK. Please check your internet connection.');
+                    } else if (errorMsg.includes('404') || errorMsg.includes('Not Found')) {
+                        throw new Error('DeepAR SDK not found. Please check your internet connection.');
+                    } else if (errorMsg.includes('Failed to fetch') || errorMsg.includes('network')) {
+                        throw new Error('Network Error: Failed to load DeepAR SDK. Check your internet connection.');
+                    } else {
+                        throw new Error(`Failed to load DeepAR SDK: ${errorMsg}`);
+                    }
+                }
+                
+                // Initialize DeepAR
+                deepARInstance = await deepar.initialize({
+                    licenseKey: DEEPAR_LICENSE_KEY,
+                    canvas: canvasElement
+                });
+
+                // Set up face detection callback
+                deepARInstance.callbacks.onFaceVisibilityChanged = (visible) => {
+                    if (visible) {
+                        setArStatus('Face detected - AR ready!');
+                        if (canvasElement && isEffectLoaded) {
+                            canvasElement.style.display = 'block';
+                            canvasElement.style.opacity = '1';
+                            canvasElement.style.visibility = 'visible';
+                            canvasElement.style.zIndex = '10';
+                        }
+                    } else {
+                        setArStatus('Show your face to camera');
+                    }
+                };
+                
+                // Suppress WASM messages
+                suppressWASMMessages();
+                
+                // Don't auto-load effect - wait for user selection
+                setArStatus('AR Ready - Select an effect');
+                isAREnabled = true;
+                updateUI();
+                
+                // Stop HTML5 video and start DeepAR camera
+                if (streamRef) {
+                    streamRef.getTracks().forEach(track => track.stop());
+                    streamRef = null;
+                }
+                if (videoElement) {
+                    videoElement.srcObject = null;
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Start DeepAR camera
+                await deepARInstance.startCamera({
+                    mediaStreamConstraints: {
+                        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+                    }
+                });
+                
+                // Hide video, show canvas (will show effect when loaded)
+                videoElement.style.display = 'none';
+                canvasElement.style.display = 'block';
+                canvasElement.style.opacity = '1';
+                canvasElement.style.visibility = 'visible';
+                canvasElement.style.zIndex = '10';
+
+                setLoading(false);
+                isAREnabled = true;
+                updateUI();
+                return true;
+
+            } catch (err) {
+                let errorMsg = err.message || 'Unknown error';
+                const errorStr = String(errorMsg).toLowerCase();
+                
+                // Check for license-related errors
+                if (errorStr.includes('license') || errorStr.includes('licence') || 
+                    errorStr.includes('invalid license') || errorStr.includes('license not valid') ||
+                    errorStr.includes('license key') || errorStr.includes('domain') || 
+                    errorStr.includes('unauthorized') || errorStr.includes('forbidden')) {
+                    errorMsg = 'License Error: DeepAR license is not valid for this domain.';
+                } else if (errorStr.includes('failed to load') || errorStr.includes('fetch') || errorStr.includes('network')) {
+                    errorMsg = 'Network Error: Failed to load DeepAR SDK. Check your internet connection.';
+                } else if (errorStr.includes('cors') || errorStr.includes('cross-origin')) {
+                    errorMsg = 'CORS Error: Failed to load DeepAR SDK.';
+                }
+                
+                setArStatus(`Error: ${errorMsg}`);
+                showError(`DeepAR failed: ${errorMsg}`);
+                setLoading(false);
+                isAREnabled = false;
+                updateUI();
+                
+                // Restart HTML5 video as fallback
+                try {
+                    if (!streamRef && videoElement) {
+                        const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+                            audio: false
+                        });
+                        videoElement.srcObject = fallbackStream;
+                        streamRef = fallbackStream;
+                        await videoElement.play();
+                        isCameraActive = true;
+                        updateUI();
+                    }
+                } catch (fallbackErr) {
+                    // Silent fail
+                }
+                
+                return false;
+            }
+        }
+
+        // Switch effect function
+        async function switchEffect(effectName) {
+            if (!deepARInstance) {
+                showError('AR not initialized. Please enable AR first.');
+                return;
+            }
+            
+            // Check if it's a .deepar file (only these work with DeepAR)
+            if (!effectName.endsWith('.deepar')) {
+                showError('Only .deepar files can be used as DeepAR face effects. GLB files are 3D models.');
+                return;
+            }
+            
+            // Don't reload if it's the same effect
+            if (currentEffect === effectName && isEffectLoaded) {
+                return;
+            }
+            
+            setLoading(true, `Loading ${effectName}...`);
+            setArStatus(`Loading ${effectName}...`);
+            
+            try {
+                // Build effect paths (Netlify serves from root)
+                const effectPaths = [
+                    `/assets/${effectName}`,
+                    `./assets/${effectName}`
+                ];
+                
+                let effectLoaded = false;
+                
+                for (const effectPath of effectPaths) {
+                    try {
+                        const loadPromise = deepARInstance.switchEffect(effectPath);
+                        const timeoutPromise = new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Effect load timeout')), 15000)
+                        );
+                        await Promise.race([loadPromise, timeoutPromise]);
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        
+                        // Update status
+                        const effectInfo = availableEffects.find(e => e.name === effectName);
+                        setArStatus(`${effectInfo?.icon || '👤'} ${effectInfo?.label || effectName} loaded - Show your face!`);
+                        
+                        // Update state
+                        currentEffect = effectName;
+                        isEffectLoaded = true;
+                        effectLoaded = true;
+                        updateUI();
+                        
+                        break; // Success
+                    } catch (err) {
+                        continue;
+                    }
+                }
+                
+                if (!effectLoaded) {
+                    throw new Error(`Failed to load ${effectName}`);
+                }
+                
+                setLoading(false);
+                
+            } catch (err) {
+                setLoading(false);
+                setArStatus('Error loading effect');
+                showError(`Failed to load effect: ${err.message || 'Unknown error'}`);
+            }
+        }
+
+        // Toggle AR
+        async function toggleAR() {
+            if (!isAREnabled && !deepARInstance) {
+                const success = await initializeDeepAR();
+                if (!success) {
+                    showError('Failed to start AR. The camera feed will continue to work.');
+                }
+            } else if (deepARInstance) {
+                isAREnabled = !isAREnabled;
+                updateUI();
+            }
+        }
+
+        // Start camera
+        async function startCamera() {
+            if (!videoElement) {
+                showError('Video element not ready');
+                return;
+            }
+
+            try {
+                setLoading(true, 'Starting camera...');
+                hideError();
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+                
+                videoElement.srcObject = stream;
+                streamRef = stream;
+                await videoElement.play();
+                
+                isCameraActive = true;
+                setLoading(false);
+                updateUI();
+                
+            } catch (err) {
+                if (err.name === 'NotAllowedError') {
+                    showError('Camera permission denied. Please allow camera access.');
+                } else if (err.name === 'NotFoundError') {
+                    showError('No camera found on this device.');
+                } else {
+                    showError(`Failed to start camera: ${err.message || 'Unknown error'}`);
+                }
+                setLoading(false);
+                isCameraActive = false;
+                updateUI();
+            }
+        }
+
+        // Stop camera
+        function stopCamera() {
+            if (deepARInstance) {
+                deepARInstance.shutdown();
+                deepARInstance = null;
+                isAREnabled = false;
+                isEffectLoaded = false;
+            }
+            
+            if (streamRef) {
+                streamRef.getTracks().forEach(track => track.stop());
+                streamRef = null;
+            }
+            
+            if (videoElement) {
+                videoElement.srcObject = null;
+            }
+            
+            isCameraActive = false;
+            setArStatus('Not initialized');
+            updateUI();
+        }
+
+        // UI Update functions
+        function updateUI() {
+            // Camera start screen
+            if (isCameraActive || isLoading) {
+                cameraStartScreen.classList.add('hidden');
+            } else {
+                cameraStartScreen.classList.remove('hidden');
+            }
+            
+            // Controls
+            if (isCameraActive) {
+                controls.classList.remove('hidden');
+            } else {
+                controls.classList.add('hidden');
+            }
+            
+            // Status container
+            if (isCameraActive) {
+                statusContainer.classList.remove('hidden');
+            } else {
+                statusContainer.classList.add('hidden');
+            }
+            
+            // AR Status
+            if (isAREnabled) {
+                arStatusEl.classList.remove('hidden');
+                arStatusEl.textContent = arStatus;
+            } else {
+                arStatusEl.classList.add('hidden');
+            }
+            
+            // Toggle AR button
+            const btnToggleAR = document.getElementById('btnToggleAR');
+            if (isAREnabled) {
+                btnToggleAR.textContent = '👋 AR Active';
+                btnToggleAR.className = 'btn-ar btn-ar-active';
+            } else {
+                btnToggleAR.textContent = '🎭 Enable AR Effect';
+                btnToggleAR.className = 'btn-ar btn-ar-inactive';
+            }
+            
+            // Video display
+            if (isCameraActive && (!isAREnabled || !isEffectLoaded)) {
+                videoElement.style.display = 'block';
+                videoElement.style.zIndex = isEffectLoaded ? '1' : '2';
+            } else {
+                videoElement.style.display = 'none';
+            }
+            
+            // Canvas display
+            if (isAREnabled && isEffectLoaded) {
+                canvasElement.style.display = 'block';
+            } else {
+                canvasElement.style.display = 'none';
+            }
+            
+            // Effect selector visibility and button states
+            if (isAREnabled && deepARInstance) {
+                effectSelector.classList.remove('hidden');
+                // Update active button state for all effect buttons
+                availableEffects.forEach((effect, index) => {
+                    const btn = document.getElementById(`btnEffect_${index}`);
+                    if (btn) {
+                        // Update active state
+                        if (currentEffect === effect.name && isEffectLoaded) {
+                            btn.classList.add('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
+                        // Enable all buttons (only .deepar files are in the list)
+                        btn.disabled = false;
+                    }
+                });
+            } else {
+                effectSelector.classList.add('hidden');
+            }
+            
+            // Instructions
+            if (isCameraActive) {
+                instructions.classList.remove('hidden');
+                if (isAREnabled && isEffectLoaded) {
+                    const effectInfo = availableEffects.find(e => e.name === currentEffect);
+                    instructions.classList.add('active');
+                    instructions.innerHTML = `
+                        <h3>👋 AR Effect Active!</h3>
+                        <p>
+                            <strong>${effectInfo?.icon || '👤'} ${effectInfo?.label || currentEffect}</strong><br>
+                            Show your face to the camera!<br>
+                            The AR effect is now active.<br><br>
+                            <span style="font-size: 11px; color: rgba(255,255,255,0.8);">
+                                Face tracking is active - move your head to see the effect!<br>
+                                Select a different effect from the left panel.
+                            </span>
+                        </p>
+                    `;
+                } else if (isAREnabled) {
+                    instructions.classList.add('active');
+                    instructions.innerHTML = `
+                        <h3>🎭 Select an Effect</h3>
+                        <p>
+                            AR system ready!<br>
+                            Choose an effect from the left panel:<br><br>
+                            <span style="font-size: 11px; color: rgba(255,255,255,0.8);">
+                                • 🌸 Flower Face<br>
+                                • 🔥 Burning Effect<br>
+                                • 💍 Diamond Ring (GLB - not supported)
+                            </span>
+                        </p>
+                    `;
+                } else {
+                    instructions.classList.remove('active');
+                    // Build effects list dynamically
+                    const effectsList = availableEffects.slice(0, 4).map(e => `• ${e.icon} ${e.label}`).join('<br>');
+                    const moreEffects = availableEffects.length > 4 ? `<br><span style="font-size: 11px; color: rgba(255,255,255,0.7);">+ ${availableEffects.length - 4} more effects available</span>` : '';
+                    instructions.innerHTML = `
+                        <h3>🎭 AR Effect Guide</h3>
+                        <p>
+                            <strong style="color: #4CAF50;">Ready to Use!</strong><br>
+                            → Click "Enable AR Effect" to start<br>
+                            → Select an effect from the left panel<br>
+                            → Show your face to the camera<br><br>
+                            <strong style="color: #2196F3;">Effects Available:</strong><br>
+                            ${effectsList}${moreEffects}
+                        </p>
+                    `;
+                }
+            } else {
+                instructions.classList.add('hidden');
+            }
+        }
+
+        function setLoading(loading, message = 'Loading...') {
+            isLoading = loading;
+            if (loadingText) {
+                loadingText.textContent = message;
+            }
+            if (loading) {
+                loadingOverlay.classList.add('active');
+            } else {
+                loadingOverlay.classList.remove('active');
+            }
+        }
+
+        function setArStatus(status) {
+            arStatus = status;
+            if (arStatusEl) {
+                arStatusEl.textContent = status;
+            }
+        }
+
+        function showError(message) {
+            error = message;
+            if (errorText) {
+                errorText.textContent = message;
+            }
+            if (errorMessage) {
+                errorMessage.classList.add('active');
+            }
+        }
+
+        function hideError() {
+            error = null;
+            if (errorMessage) {
+                errorMessage.classList.remove('active');
+            }
+        }
+
+        function dismissError() {
+            hideError();
+        }
+    </script>
+</body>
+</html>
